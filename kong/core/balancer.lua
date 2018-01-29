@@ -1,5 +1,6 @@
 local pl_tablex = require "pl.tablex"
 local singletons = require "kong.singletons"
+local resty_lock = require "resty.lock"
 
 -- due to startup/require order, cannot use the ones from 'singletons' here
 local dns_client = require "resty.dns.client"
@@ -27,6 +28,7 @@ local _load_targets_into_memory
 
 -- table holding our balancer objects, indexed by upstream name
 local balancers = {}
+local balancers_initialized = nil
 
 
 -- objects whose lifetimes are bound to that of a balancer
@@ -603,10 +605,29 @@ end
 
 
 local function init()
+
+  if balancers_initialized then
+    return true
+  end
+
+  local lock, err = resty_lock:new("kong", { timeout = 3600 })
+  if not lock then
+    return nil, "error acquiring lock: " .. err
+  end
+
+  local lock_id = "balancer.init." .. tostring(ngx.worker.id())
+  local elapsed, err = lock:lock(lock_id)
+  if not elapsed then
+    return nil, "could not wait for balancer initialization: " .. err
+  end
+
+  if balancers_initialized then
+    return true
+  end
+
   local upstreams, err = get_all_upstreams()
   if not upstreams then
-    log(ngx.STDERR, "failed loading initial list of upstreams: ", err)
-    return
+    return nil, "failed loading initial list of upstreams: " .. err
   end
 
   local oks, errs = 0, 0
@@ -616,11 +637,16 @@ local function init()
     if ok ~= nil then
       oks = oks + 1
     else
-      log(ngx.STDERR, "failed creating balancer for ", name, ": ", err)
+      log(ngx.ERR, "failed creating balancer for ", name, ": ", err)
       errs = errs + 1
     end
   end
   log(DEBUG, "initialized ", oks, " balancer(s), ", errs, " error(s)")
+
+  balancers_initialized = true
+  lock:unlock()
+
+  return true
 end
 
 

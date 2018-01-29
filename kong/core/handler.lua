@@ -31,6 +31,7 @@ local unpack   = unpack
 
 local router, router_err, router_version
 local server_header = _KONG._NAME.."/".._KONG._VERSION
+local balancer_initialized = false
 
 
 local function get_now()
@@ -83,12 +84,6 @@ return {
       local cache          = singletons.cache
       local worker_events  = singletons.worker_events
       local cluster_events = singletons.cluster_events
-
-
-      -- initialize balancers
-
-
-      balancer.init()
 
 
       -- events dispatcher
@@ -320,6 +315,17 @@ return {
   },
   access = {
     before = function(ctx)
+
+      -- ensure upstreams are initialized
+
+      if not balancer_initialized then
+        local ok, err = balancer.init()
+        if not ok then
+          log(ngx.ERR, err)
+        end
+        balancer_initialized = true
+      end
+
       -- ensure router is up-to-date
 
       local version, err = singletons.cache:get("router:version", {
