@@ -95,8 +95,28 @@ describe("Configuration loader", function()
     assert.equal(false, conf.proxy_listeners[2].http2)
     assert.equal("0.0.0.0:8443 ssl", conf.proxy_listeners[2].listener)
   end)
+  it("extracts ssl flags properly when hostnames contain them", function()
+    local conf
+    conf = assert(conf_loader(nil, {
+      proxy_listen = "ssl.myname.com:8000",
+      admin_listen = "ssl.myname.com:8001",
+    }))
+    assert.equal("ssl.myname.com", conf.proxy_listeners[1].ip)
+    assert.equal(false, conf.proxy_listeners[1].ssl)
+    assert.equal("ssl.myname.com", conf.admin_listeners[1].ip)
+    assert.equal(false, conf.admin_listeners[1].ssl)
+
+    conf = assert(conf_loader(nil, {
+      proxy_listen = "ssl_myname.com:8000 ssl",
+      admin_listen = "ssl_myname.com:8001 ssl",
+    }))
+    assert.equal("ssl_myname.com", conf.proxy_listeners[1].ip)
+    assert.equal(true, conf.proxy_listeners[1].ssl)
+    assert.equal("ssl_myname.com", conf.admin_listeners[1].ip)
+    assert.equal(true, conf.admin_listeners[1].ssl)
+  end)
   it("extracts 'off' from proxy_listen/admin_listen", function()
-      local conf
+    local conf
     conf = assert(conf_loader(nil, {
       proxy_listen = "off",
       admin_listen = "off",
