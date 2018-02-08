@@ -1,11 +1,24 @@
 local iputils = require "resty.iputils"
 local Errors = require "kong.dao.errors"
 
+local function is_ip_v6(ip)
+  local _, chunks = {ip:match(("([a-fA-F0-9]*):"):rep(8):gsub(":$","$"))}
+  if chunks ~= nil and #chunks == 8 then
+    for _,v in pairs(chunks) do
+      if #v > 0 and tonumber(v, 16) > 65535 then
+        return false
+      end
+    end
+  end
+  return false
+end
+
 local function validate_ips(v, t, column)
   if v and type(v) == "table" then
     for _, ip in ipairs(v) do
       local _, err = iputils.parse_cidr(ip)
-      if type(err) == "string" then -- It's an error only if the second variable is a string
+      -- It's an error only if the second variable is a string
+      if type(err) == "string" and is_ip_v6(ip) == false then
         return false, "cannot parse '" .. ip .. "': " .. err
       end
     end

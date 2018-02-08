@@ -5,10 +5,10 @@ local v = schemas_validation.validate_entity
 
 describe("Plugin: ip-restriction (schema)", function()
   it("should accept a valid whitelist", function()
-    assert(v({whitelist = {"127.0.0.1", "127.0.0.2"}}, schema))
+    assert(v({whitelist = {"127.0.0.1", "127.0.0.2", "::1"}}, schema))
   end)
   it("should accept a valid blacklist", function()
-    assert(v({blacklist = {"127.0.0.1", "127.0.0.2"}}, schema))
+    assert(v({blacklist = {"127.0.0.1", "127.0.0.2", "::1"}}, schema))
   end)
 
   describe("errors", function()
